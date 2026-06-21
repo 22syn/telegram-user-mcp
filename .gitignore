@@ -1,0 +1,10 @@
+node_modules/
+
+# Telegram credentials & session live in $HOME, never in the repo:
+#   ~/.telegram-mcp-config.json   (apiId / apiHash)
+#   ~/.telegram-mcp-session       (GramJS StringSession)
+# Guard against accidental copies landing here:
+.telegram-mcp-config.json
+.telegram-mcp-session
+*.session
+.env
