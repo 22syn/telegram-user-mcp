@@ -6,6 +6,14 @@
  *   - search_messages(groupUrl, query) → keyword search
  *   - get_group_info(groupUrl)         → group metadata
  */
+// ── stdio MCP protocol guard ─────────────────────────────────────────────────
+// stdout is reserved for line-delimited JSON-RPC. Anything else on stdout breaks
+// the client's JSON.parse (e.g. "Unexpected token '\x1b', \"[33m[2026\"...").
+// GramJS's internal logger writes via console.log → stdout, so route every
+// stdout-bound console.* through console.error (stderr). The MCP transport uses
+// process.stdout.write directly and is unaffected.
+console.log = console.info = console.debug = console.warn = (...a) => console.error(...a);
+
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
@@ -30,6 +38,8 @@ const sessionStr = fs.readFileSync(SESSION_PATH, 'utf8').trim();
 const client = new TelegramClient(new StringSession(sessionStr), Number(apiId), apiHash, {
     connectionRetries: 3,
 });
+// Silence GramJS's own logger entirely (keeps even stderr clean of MTProto chatter).
+client.setLogLevel('none');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 /** Resolve a group URL/username/id to a Telegram entity */
