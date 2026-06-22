@@ -14,7 +14,7 @@
 // process.stdout.write directly and is unaffected.
 console.log = console.info = console.debug = console.warn = (...a) => console.error(...a);
 
-const { TelegramClient } = require('telegram');
+const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
@@ -132,13 +132,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
             case 'get_group_info': {
                 const entity = await resolveGroup(args.groupUrl);
+
+                // getEntity() doesn't populate participantsCount/about — fetch the
+                // full object so channels and basic groups report member counts.
+                let members = entity.participantsCount ?? null;
+                let about   = entity.about ?? null;
+                try {
+                    let full;
+                    if (entity.className === 'Channel') {
+                        full = await client.invoke(new Api.channels.GetFullChannel({ channel: entity }));
+                    } else if (entity.className === 'Chat') {
+                        full = await client.invoke(new Api.messages.GetFullChat({ chatId: entity.id }));
+                    }
+                    if (full?.fullChat) {
+                        members = full.fullChat.participantsCount ?? members;
+                        about   = full.fullChat.about ?? about;
+                    }
+                } catch { /* keep entity-level fallbacks */ }
+
                 const info = [
                     `Title: ${entity.title || entity.firstName || 'N/A'}`,
                     `ID: ${entity.id}`,
                     `Username: ${entity.username ? '@' + entity.username : 'N/A'}`,
-                    `Members: ${entity.participantsCount ?? 'N/A'}`,
+                    `Members: ${members ?? 'N/A'}`,
                     `Type: ${entity.className}`,
-                    entity.about ? `About: ${entity.about}` : null,
+                    about ? `About: ${about}` : null,
                 ].filter(Boolean);
                 return { content: [{ type: 'text', text: info.join('\n') }] };
             }
