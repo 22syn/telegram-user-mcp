@@ -14,7 +14,7 @@
 // process.stdout.write directly and is unaffected.
 console.log = console.info = console.debug = console.warn = (...a) => console.error(...a);
 
-const { TelegramClient, Api } = require('telegram');
+const { TelegramClient, Api, utils } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
@@ -50,11 +50,24 @@ client.setLogLevel('none');
 // ── Helpers ────────────────────────────────────────────────────────────────
 /** Resolve a group URL/username/id to a Telegram entity */
 async function resolveGroup(groupUrl) {
-    // Accept: https://t.me/foo, @foo, -100123456, "foo"
-    let identifier = groupUrl
-        .replace('https://t.me/', '')
-        .replace('http://t.me/', '')
-        .replace(/^@/, '');
+    // Accept: https://t.me/foo, @foo, -1001234567890, 1234567890, "foo"
+    const identifier = String(groupUrl)
+        .replace(/^https?:\/\/t\.me\//, '')
+        .replace(/^@/, '')
+        .trim();
+    // Numeric ids must be passed as a number (a string is read as a PeerUser).
+    // A bare positive id from list_dialogs is a channel/supergroup, whose
+    // canonical resolvable form is the -100… marked id — fall back to that.
+    if (/^-?\d+$/.test(identifier)) {
+        try {
+            return await client.getEntity(Number(identifier));
+        } catch (e) {
+            if (/^\d+$/.test(identifier)) {
+                return await client.getEntity(Number(`-100${identifier}`));
+            }
+            throw e;
+        }
+    }
     return await client.getEntity(identifier);
 }
 
@@ -63,7 +76,9 @@ function formatMsg(msg) {
     const sender = msg.sender
         ? (msg.sender.username ? `@${msg.sender.username}` : msg.sender.firstName || 'Unknown')
         : 'Unknown';
-    return `[${date}] ${sender}: ${msg.message || '[media/no text]'}`;
+    // Surface the id (needed to target get_message/download_media) and a media tag.
+    const media = msg.media ? ` [${mediaInfo(msg).type}]` : '';
+    return `#${msg.id} [${date}] ${sender}:${media} ${msg.message || '[no text]'}`;
 }
 
 /** Safely coerce GramJS BigInteger | number | null → JS number. */
@@ -386,7 +401,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     const e   = d.entity || {};
                     const un  = e.username ? `@${e.username}` : '';
                     const unr = d.unreadCount ? ` (${d.unreadCount} unread)` : '';
-                    return `${e.className || '?'}: ${d.title || '(no title)'} ${un}${unr}  [id:${e.id}]`;
+                    // Print the marked id (-100… for channels) so it resolves directly.
+                    const id  = e.id != null ? utils.getPeerId(e) : '?';
+                    return `${e.className || '?'}: ${d.title || '(no title)'} ${un}${unr}  [id:${id}]`;
                 });
                 return { content: [{ type: 'text', text: `${lines.length} dialogs:\n` + lines.join('\n') }] };
             }
