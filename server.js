@@ -288,7 +288,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                 properties: {
                     groupUrl:  { type: 'string', description: 'Group URL or @username' },
                     messageId: { type: 'number', description: 'Message id' },
-                    maxMB:     { type: 'number', description: 'Override the max download size in MB for this call' },
+                    maxMB:     { type: 'number', description: 'Override the max download size in MB for this call (0 = no limit)' },
+                },
+                required: ['groupUrl', 'messageId'],
+            },
+        },
+        {
+            name: 'get_thumbnail',
+            description: 'Download only the small preview image (thumbnail) of a message\'s media — a few KB instead of the full video/file. Returns the saved image path.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    groupUrl:  { type: 'string', description: 'Group URL or @username' },
+                    messageId: { type: 'number', description: 'Message id' },
                 },
                 required: ['groupUrl', 'messageId'],
             },
@@ -457,9 +469,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
                 const info  = mediaInfo(msg);
                 const capMB = args.maxMB ?? MAX_DOWNLOAD_MB;
-                if (info.sizeBytes != null && info.sizeBytes > capMB * 1024 * 1024) {
+                // capMB === 0 means no limit (for deliberately large downloads).
+                if (capMB > 0 && info.sizeBytes != null && info.sizeBytes > capMB * 1024 * 1024) {
                     const mb = (info.sizeBytes / 1024 / 1024).toFixed(1);
-                    return { content: [{ type: 'text', text: `❌ File is ${mb} MB, over the ${capMB} MB limit. Pass a higher maxMB to override.` }], isError: true };
+                    return { content: [{ type: 'text', text: `❌ File is ${mb} MB, over the ${capMB} MB limit. Pass a higher maxMB (or maxMB: 0 for no limit) to override.` }], isError: true };
                 }
 
                 const base = info.fileName ? safeName(info.fileName) : `${entity.id}_${args.messageId}${extFor(info)}`;
@@ -474,6 +487,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 }
                 const bytes = fs.existsSync(out) ? fs.statSync(out).size : 0;
                 return { content: [{ type: 'text', text: `💾 Saved: ${out}\nSize: ${(bytes / 1024 / 1024).toFixed(2)} MB` }] };
+            }
+
+            case 'get_thumbnail': {
+                const entity = await resolveGroup(args.groupUrl);
+                const [msg]  = await client.getMessages(entity, { ids: args.messageId });
+                if (!msg)       return { content: [{ type: 'text', text: `(message ${args.messageId} not found)` }] };
+                if (!msg.media) return { content: [{ type: 'text', text: '(message has no media)' }] };
+
+                // Thumbnails live on the document (video/file) or as photo sizes.
+                const doc    = msg.media.document;
+                const thumbs = doc ? (doc.thumbs || []) : (msg.media.photo?.sizes || []);
+                if (!thumbs.length) {
+                    return { content: [{ type: 'text', text: '(no thumbnail available for this media)' }], isError: true };
+                }
+                // Pick the largest thumbnail by pixel area.
+                let best = 0;
+                for (let i = 1; i < thumbs.length; i++) {
+                    const area  = (thumbs[i].w || 0) * (thumbs[i].h || 0);
+                    const bestA = (thumbs[best].w || 0) * (thumbs[best].h || 0);
+                    if (area > bestA) best = i;
+                }
+                const out = path.join(DOWNLOAD_DIR, `${entity.id}_${args.messageId}_thumb.jpg`);
+                try {
+                    await client.downloadMedia(msg, { thumb: best, outputFile: out });
+                } catch (e) {
+                    return { content: [{ type: 'text', text: `❌ Thumbnail download failed: ${e.message}` }], isError: true };
+                }
+                const bytes = fs.existsSync(out) ? fs.statSync(out).size : 0;
+                return { content: [{ type: 'text', text: `🖼️ Thumbnail saved: ${out}\nSize: ${(bytes / 1024).toFixed(0)} KB` }] };
             }
 
             default:
