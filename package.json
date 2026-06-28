@@ -1,13 +1,45 @@
 {
-  "name": "telegram-mcp",
+  "name": "telegram-user-mcp",
   "version": "1.0.0",
-  "description": "Standalone MCP server that connects as a real Telegram user (MTProto/GramJS) and exposes read-only group tools: read_messages, search_messages, get_group_info.",
+  "description": "MCP server that connects as a real Telegram user (MTProto/GramJS) and exposes read-only tools: read/search messages, list dialogs & folders, group info, pinned, media info, and media download.",
   "type": "commonjs",
   "main": "server.js",
-  "bin": { "telegram-mcp": "server.js" },
+  "bin": {
+    "telegram-user-mcp": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "server.js",
+    "setup.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node server.js",
-    "login": "node auth.js"
+    "setup": "node setup.js",
+    "login": "node setup.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "telegram",
+    "mtproto",
+    "gramjs",
+    "claude",
+    "ai"
+  ],
+  "author": "Kobi Hazout",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KobiHaz/telegram-user-mcp.git"
+  },
+  "homepage": "https://github.com/KobiHaz/telegram-user-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/KobiHaz/telegram-user-mcp/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -1,83 +1,114 @@
-# telegram-mcp
+# telegram-user-mcp
 
-Standalone MCP server that connects to Telegram **as the real user account** (MTProto
-via [GramJS](https://github.com/gram-js/gram-js)) and exposes read-only group tools.
-Used by Smart Volume Radar to mine stock-thesis channels (e.g. `@kikarhashuk`).
+An [MCP](https://modelcontextprotocol.io) server that connects to Telegram **as your
+real user account** (MTProto via [GramJS](https://github.com/gram-js/gram-js)) and
+exposes read-only tools — read & search messages, list your chats/folders, inspect
+group info, and download media — to any MCP client (Claude Desktop, Cursor, etc.).
 
-## Tools
+Because it logs in as **you**, it can see everything your account can: private
+channels and groups you're a member of, DMs, and their media. A bot cannot do this —
+that's the whole point of this server.
 
-All tools are **read-only**.
+> ⚠️ **Security:** logging in creates a session string in `~/.telegram-mcp-session`.
+> That string grants **full access to your Telegram account** — treat it like a
+> password. Never share it, never commit it, never paste it into a hosted service.
+> This server keeps it on your machine and only ever reads.
 
-### Reading & search
-| Tool | Args | Returns |
-|------|------|---------|
-| `read_messages`   | `groupUrl`, `limit` | recent messages from a group/channel |
-| `search_messages` | `groupUrl`, `query`, `limit` | keyword search within a group/channel |
-| `fetch_since`     | `groupUrl`, `sinceId`, `limit` | only messages newer than `sinceId` (incremental polling); returns the new max id |
-| `get_message`     | `groupUrl`, `messageId` | one message + metadata (views/forwards/reactions/replies/media flag) |
-| `global_search`   | `query`, `limit` | search across **all** chats the account is in |
+## Quick start
 
-### Discovery & navigation
-| Tool | Args | Returns |
-|------|------|---------|
-| `get_group_info`  | `groupUrl`          | group/channel metadata (title, members, about) |
-| `list_dialogs`    | `limit`, `archived` | all chats/channels the account is in, with unread counts |
-| `list_folders`    | —                   | chat folders (dialog filters) on the account |
-| `get_pinned`      | `groupUrl`, `limit` | pinned message(s) of a group/channel |
+You need [Node.js](https://nodejs.org) ≥ 18.
 
-### Media
-| Tool | Args | Returns |
-|------|------|---------|
-| `get_media_info`  | `groupUrl`, `messageId` | media type/mime/size/duration/filename **without** downloading |
-| `download_media`  | `groupUrl`, `messageId`, `maxMB` | downloads video/photo/document/voice to disk (works for private groups); returns the saved file path |
+### 1. Get Telegram API credentials
 
-Media downloads land in `~/.telegram-mcp-downloads/` (override with `downloadDir` in config).
-`download_media` refuses files over `maxDownloadMB` (default 200) unless `maxMB` overrides it,
-and reports a clear error for channels that restrict saving (`no-forward`).
+Go to <https://my.telegram.org> → **API development tools** → create an app, and copy
+your `api_id` and `api_hash`. (These identify the app, not your account.)
 
-Internal MCP server name: `telegram-user`.
-
-## Credentials (kept outside this repo)
-
-`server.js` reads, from `$HOME`:
-
-- `~/.telegram-mcp-config.json` — `{ "apiId": ..., "apiHash": "..." }`
-  (optional: `"downloadDir"`, `"maxDownloadMB"` — default `~/.telegram-mcp-downloads/`, `200`)
-- `~/.telegram-mcp-session` — GramJS `StringSession` string
-
-These are **never** committed (see `.gitignore`). To (re)generate the session:
+### 2. Run setup (one time)
 
 ```bash
-npm run login   # runs auth.js — interactive MTProto login, writes ~/.telegram-mcp-session
+npx telegram-user-mcp setup
 ```
 
-## Run
+It asks for your `api_id`, `api_hash`, and phone number, then logs you in (you'll get
+a login code in the Telegram app; enter it, plus your 2FA password if you have one).
+This writes:
 
-```bash
-npm install
-npm start       # node server.js — speaks MCP over stdio
-```
+- `~/.telegram-mcp-config.json` — `{ apiId, apiHash, phoneNumber }`
+- `~/.telegram-mcp-session` — your login session (keep secret)
 
-## Registered as an MCP server
+### 3. Register it in your MCP client
 
-Point an MCP client at the absolute path:
+**Claude Desktop** (`claude_desktop_config.json`) or **Cursor** (`~/.cursor/mcp.json`):
 
 ```json
 {
   "mcpServers": {
     "telegram": {
-      "command": "node",
-      "args": ["/Users/kobihazout/telegram-mcp/server.js"]
+      "command": "npx",
+      "args": ["-y", "telegram-user-mcp"]
     }
   }
 }
 ```
 
-The Smart Volume Radar project wires this in via its own `.mcp.json`.
+Restart the client. The Telegram tools will appear.
 
-## Not included here
+## Tools (all read-only)
 
-The Radar's Telegram/Form-4 pipeline scripts (`daily-update.js`, `watchlist-health.js`,
-`insider-fetch.js`, `weekly-insider-report.js`, …) used to live in this folder. They were
-moved into the radar project at `smart-volume-radar/tools/tg-radar/` so this repo stays a
-clean, reusable MCP server.
+### Reading & search
+| Tool | Args | Returns |
+|------|------|---------|
+| `read_messages`   | `groupUrl`, `limit` | recent messages (with id + media tag) |
+| `search_messages` | `groupUrl`, `query`, `limit` | keyword search within a chat |
+| `fetch_since`     | `groupUrl`, `sinceId`, `limit` | only messages newer than `sinceId`; returns the new max id |
+| `get_message`     | `groupUrl`, `messageId` | one message + metadata (views/forwards/reactions/replies/media flag) |
+| `global_search`   | `query`, `limit` | search across **all** chats you're in |
+
+### Discovery & navigation
+| Tool | Args | Returns |
+|------|------|---------|
+| `get_group_info`  | `groupUrl`          | group/channel metadata (title, members, about) |
+| `list_dialogs`    | `limit`, `archived` | all chats/channels you're in, with unread counts |
+| `list_folders`    | —                   | chat folders (dialog filters) |
+| `get_pinned`      | `groupUrl`, `limit` | pinned message(s) |
+
+### Media
+| Tool | Args | Returns |
+|------|------|---------|
+| `get_media_info`  | `groupUrl`, `messageId` | media type/mime/size/duration/filename **without** downloading |
+| `download_media`  | `groupUrl`, `messageId`, `maxMB` | downloads video/photo/document/voice to disk; returns the saved path |
+
+`groupUrl` accepts a `https://t.me/...` link, an `@username`, or a numeric id (as
+printed by `list_dialogs`). Media downloads land in `~/.telegram-mcp-downloads/`.
+`download_media` refuses files over `maxDownloadMB` (default 200) unless `maxMB`
+overrides it, and reports a clear error for channels that restrict saving (no-forward).
+
+## Configuration
+
+`~/.telegram-mcp-config.json`:
+
+```json
+{
+  "apiId": 123456,
+  "apiHash": "your_api_hash",
+  "phoneNumber": "+9725...",
+  "downloadDir": "~/.telegram-mcp-downloads",
+  "maxDownloadMB": 200
+}
+```
+
+`downloadDir` and `maxDownloadMB` are optional.
+
+## Run from source
+
+```bash
+git clone https://github.com/KobiHaz/telegram-user-mcp.git
+cd telegram-user-mcp
+npm install
+npm run setup
+npm start
+```
+
+## License
+
+MIT © Kobi Hazout
