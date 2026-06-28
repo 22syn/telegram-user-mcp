@@ -1,6 +1,6 @@
 {
   "name": "telegram-user-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server that connects as a real Telegram user (MTProto/GramJS) and exposes read-only tools: read/search messages, list dialogs & folders, group info, pinned, media info, and media download.",
   "type": "commonjs",
   "main": "server.js",

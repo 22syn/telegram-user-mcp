@@ -76,12 +76,15 @@ Restart the client. The Telegram tools will appear.
 | Tool | Args | Returns |
 |------|------|---------|
 | `get_media_info`  | `groupUrl`, `messageId` | media type/mime/size/duration/filename **without** downloading |
+| `get_thumbnail`   | `groupUrl`, `messageId` | downloads just the small preview image (a few KB) instead of the full video/file |
 | `download_media`  | `groupUrl`, `messageId`, `maxMB` | downloads video/photo/document/voice to disk; returns the saved path |
 
 `groupUrl` accepts a `https://t.me/...` link, an `@username`, or a numeric id (as
 printed by `list_dialogs`). Media downloads land in `~/.telegram-mcp-downloads/`.
 `download_media` refuses files over `maxDownloadMB` (default 200) unless `maxMB`
-overrides it, and reports a clear error for channels that restrict saving (no-forward).
+overrides it (`maxMB: 0` = no limit), and reports a clear error for channels that
+restrict saving (no-forward). For heavy videos you only want to preview, use
+`get_thumbnail` — a 1 GB video has an ~18 KB thumbnail.
 
 ## Configuration
 
