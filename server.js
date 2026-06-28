@@ -29,8 +29,11 @@ const SESSION_PATH = path.join(process.env.HOME, '.telegram-mcp-session');
 const CONFIG_PATH  = path.join(process.env.HOME, '.telegram-mcp-config.json');
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
-if (!fs.existsSync(CONFIG_PATH)) throw new Error(`Config missing: ${CONFIG_PATH}`);
-if (!fs.existsSync(SESSION_PATH)) throw new Error(`Session missing — run auth.js first`);
+if (!fs.existsSync(CONFIG_PATH) || !fs.existsSync(SESSION_PATH)) {
+    console.error('❌ Not set up yet. Run:  npx telegram-user-mcp setup');
+    console.error('   (creates ~/.telegram-mcp-config.json and logs in to Telegram)');
+    process.exit(1);
+}
 
 const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 const { apiId, apiHash } = cfg;
