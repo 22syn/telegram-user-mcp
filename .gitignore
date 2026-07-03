@@ -1,5 +1,10 @@
 node_modules/
 
+# Project data never belongs in this generic MCP server's public repo.
+# (A sibling project used to write its own state file here by mistake —
+# fixed at the source, this guards against it recurring.)
+data/
+
 # Telegram credentials & session live in $HOME, never in the repo:
 #   ~/.telegram-mcp-config.json   (apiId / apiHash)
 #   ~/.telegram-mcp-session       (GramJS StringSession)
