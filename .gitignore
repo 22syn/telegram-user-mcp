@@ -13,3 +13,5 @@ data/
 .telegram-mcp-session
 *.session
 .env
+graphify-out/
+.claude/skills/
