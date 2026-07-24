@@ -44,6 +44,9 @@ const DOWNLOAD_DIR    = cfg.downloadDir || path.join(process.env.HOME, '.telegra
 const MAX_DOWNLOAD_MB = cfg.maxDownloadMB ?? 200;
 fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
+// Fixed send-only target for the Hermes Agent bot — the ONLY chat this server can send to.
+const HERMES_BOT = cfg.hermesBot || null;
+
 const client = new TelegramClient(new StringSession(sessionStr), Number(apiId), apiHash, {
     connectionRetries: 3,
 });
@@ -305,6 +308,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                 required: ['groupUrl', 'messageId'],
             },
         },
+        {
+            name: 'send_hermes_message',
+            description: 'Send a plain-text message to the Hermes Agent bot chat. This is the only tool that can send messages — the target chat is fixed by "hermesBot" in ~/.telegram-mcp-config.json and cannot be overridden by the caller. Every other tool in this server remains read-only.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    text: { type: 'string', description: 'Message text to send to the Hermes Agent bot' },
+                },
+                required: ['text'],
+            },
+        },
     ],
 }));
 
@@ -516,6 +530,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 }
                 const bytes = fs.existsSync(out) ? fs.statSync(out).size : 0;
                 return { content: [{ type: 'text', text: `🖼️ Thumbnail saved: ${out}\nSize: ${(bytes / 1024).toFixed(0)} KB` }] };
+            }
+
+            case 'send_hermes_message': {
+                if (!HERMES_BOT) {
+                    return { content: [{ type: 'text', text: '❌ "hermesBot" is not set in ~/.telegram-mcp-config.json. Add e.g. "hermesBot": "@xsheva_bot" and restart the server.' }], isError: true };
+                }
+                const entity = await resolveGroup(HERMES_BOT);
+                let sent;
+                try {
+                    sent = await client.sendMessage(entity, { message: args.text });
+                } catch (e) {
+                    return { content: [{ type: 'text', text: `❌ Send failed: ${e.message}` }], isError: true };
+                }
+                const date = new Date(sent.date * 1000).toISOString().slice(0, 16).replace('T', ' ');
+                return { content: [{ type: 'text', text: `✅ Sent to Hermes Agent (#${sent.id} [${date}]): ${args.text}` }] };
             }
 
             default:
