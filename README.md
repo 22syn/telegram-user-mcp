@@ -101,6 +101,17 @@ end to end.
 
 Messages that are not part of an album carry no tag (`album:none` in `get_message`).
 
+### Replies
+
+`read_messages` also appends `[reply:<id>]` when a message replies to another, and
+`get_message` reports `reply:<id>`. This is the only **explicit** link Telegram offers between
+two separate messages, which matters when a caption and its media were posted as two messages
+rather than as an album: on one tracked channel that is 18.8% of all messages.
+
+Timing is not a substitute. A text-only message followed a second later by a media-only message
+is indistinguishable from two unrelated posts — measured on a channel that fires bursts of
+separate forwarded items inside one second. Use `reply:`; do not infer from timestamps.
+
 ## Configuration
 
 `~/.telegram-mcp-config.json`:

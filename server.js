@@ -84,6 +84,15 @@ function groupId(msg) {
     return g == null ? null : String(g);
 }
 
+/** Id of the message this one replies to, or null.
+ *  This is the only EXPLICIT link Telegram gives between two separate messages. Timing is not
+ *  a substitute: a text-only message followed by a media-only message looks identical whether
+ *  it is a caption meeting its media or two unrelated posts. A reply is an author action. */
+function replyToId(msg) {
+    const r = msg.replyTo?.replyToMsgId;
+    return r == null ? null : Number(r);
+}
+
 function formatMsg(msg) {
     // Seconds matter: the album fallback for messages without a groupedId keys off a 2s
     // window, and a same-MINUTE rule would wrongly merge unrelated bursts.
@@ -94,8 +103,9 @@ function formatMsg(msg) {
     // Surface the id (needed to target get_message/download_media) and a media tag.
     const media = msg.media ? ` [${mediaInfo(msg).type}]` : '';
     // Appended at the END so the `#(\d+)` id-cursor regex consumers use keeps matching.
+    const rep = replyToId(msg) ? ` [reply:${replyToId(msg)}]` : '';
     const grp = groupId(msg) ? ` [album:${groupId(msg)}]` : '';
-    return `#${msg.id} [${date}] ${sender}:${media} ${msg.message || '[no text]'}${grp}`;
+    return `#${msg.id} [${date}] ${sender}:${media} ${msg.message || '[no text]'}${rep}${grp}`;
 }
 
 /** Safely coerce GramJS BigInteger | number | null → JS number. */
@@ -171,6 +181,7 @@ function msgMeta(msg) {
         replies:  msg.replies?.replies ?? null,
         hasMedia: !!msg.media,
         albumId:  groupId(msg),
+        replyTo:  replyToId(msg),
     };
 }
 
@@ -396,7 +407,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const meta = msgMeta(msg);
                 const text = [
                     formatMsg(msg),
-                    `— views:${meta.views ?? 'N/A'} forwards:${meta.forwards ?? 'N/A'} reactions:${meta.reactions} replies:${meta.replies ?? 'N/A'} media:${meta.hasMedia} album:${meta.albumId ?? 'none'}`,
+                    `— views:${meta.views ?? 'N/A'} forwards:${meta.forwards ?? 'N/A'} reactions:${meta.reactions} replies:${meta.replies ?? 'N/A'} media:${meta.hasMedia} album:${meta.albumId ?? 'none'} reply:${meta.replyTo ?? 'none'}`,
                 ].join('\n');
                 return { content: [{ type: 'text', text }] };
             }
