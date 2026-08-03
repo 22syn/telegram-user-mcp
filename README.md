@@ -58,7 +58,7 @@ Restart the client. The Telegram tools will appear.
 ### Reading & search
 | Tool | Args | Returns |
 |------|------|---------|
-| `read_messages`   | `groupUrl`, `limit` | recent messages (with id + media tag) |
+| `read_messages`   | `groupUrl`, `limit` | recent messages (with id, media tag + album id) |
 | `search_messages` | `groupUrl`, `query`, `limit` | keyword search within a chat |
 | `fetch_since`     | `groupUrl`, `sinceId`, `limit` | only messages newer than `sinceId`; returns the new max id |
 | `get_message`     | `groupUrl`, `messageId` | one message + metadata (views/forwards/reactions/replies/media flag) |
@@ -85,6 +85,21 @@ printed by `list_dialogs`). Media downloads land in `~/.telegram-mcp-downloads/`
 overrides it (`maxMB: 0` = no limit), and reports a clear error for channels that
 restrict saving (no-forward). For heavy videos you only want to preview, use
 `get_thumbnail` — a 1 GB video has an ~18 KB thumbnail.
+
+
+### Album grouping
+
+A Telegram album — one caption plus N photos — arrives as N separate messages. They are tied
+together only by `groupedId`, which `read_messages` now appends as `[album:<id>]` and
+`get_message` reports as `album:<id>`. Without it a consumer cannot tell that a caption belongs
+to the images posted beside it, and the evidence gets severed from the claim.
+
+**The id is a string, deliberately.** These values routinely exceed `Number.MAX_SAFE_INTEGER`,
+so putting them through a numeric coercion is lossy: `14285256815022453` collapses to
+`...452`, which is a *different album's* id. Two unrelated posts would merge. Keep it a string
+end to end.
+
+Messages that are not part of an album carry no tag (`album:none` in `get_message`).
 
 ## Configuration
 

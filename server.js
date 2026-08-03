@@ -74,6 +74,16 @@ async function resolveGroup(groupUrl) {
     return await client.getEntity(identifier);
 }
 
+/** Telegram album id, as a STRING.
+ *  An album (caption + N photos) arrives as N separate messages sharing one groupedId, so
+ *  without it a consumer cannot tell that a caption belongs to the images posted beside it.
+ *  MUST NOT go through toNum(): every value observed in a 30-day window exceeded
+ *  Number.MAX_SAFE_INTEGER (e.g. 14285256815022452), so toJSNumber() silently corrupts them. */
+function groupId(msg) {
+    const g = msg.groupedId;
+    return g == null ? null : String(g);
+}
+
 function formatMsg(msg) {
     const date = new Date(msg.date * 1000).toISOString().slice(0, 16).replace('T', ' ');
     const sender = msg.sender
@@ -81,7 +91,9 @@ function formatMsg(msg) {
         : 'Unknown';
     // Surface the id (needed to target get_message/download_media) and a media tag.
     const media = msg.media ? ` [${mediaInfo(msg).type}]` : '';
-    return `#${msg.id} [${date}] ${sender}:${media} ${msg.message || '[no text]'}`;
+    // Appended at the END so the `#(\d+)` id-cursor regex consumers use keeps matching.
+    const grp = groupId(msg) ? ` [album:${groupId(msg)}]` : '';
+    return `#${msg.id} [${date}] ${sender}:${media} ${msg.message || '[no text]'}${grp}`;
 }
 
 /** Safely coerce GramJS BigInteger | number | null → JS number. */
@@ -156,6 +168,7 @@ function msgMeta(msg) {
         reactions,
         replies:  msg.replies?.replies ?? null,
         hasMedia: !!msg.media,
+        albumId:  groupId(msg),
     };
 }
 
@@ -381,7 +394,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const meta = msgMeta(msg);
                 const text = [
                     formatMsg(msg),
-                    `— views:${meta.views ?? 'N/A'} forwards:${meta.forwards ?? 'N/A'} reactions:${meta.reactions} replies:${meta.replies ?? 'N/A'} media:${meta.hasMedia}`,
+                    `— views:${meta.views ?? 'N/A'} forwards:${meta.forwards ?? 'N/A'} reactions:${meta.reactions} replies:${meta.replies ?? 'N/A'} media:${meta.hasMedia} album:${meta.albumId ?? 'none'}`,
                 ].join('\n');
                 return { content: [{ type: 'text', text }] };
             }
