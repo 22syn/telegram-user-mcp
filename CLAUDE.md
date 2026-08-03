@@ -1,6 +1,7 @@
 # CLAUDE.md — telegram-mcp
 
 > 📋 **Active plan (2026-07-23):** [docs/plans/2026-07-23-graph-audit-followup.md](docs/plans/2026-07-23-graph-audit-followup.md) — graph-audit follow-up; review before structural changes.
+> 📋 **Improvement plan (2026-07-23):** [docs/plans/2026-07-23-improvement-plan.md](docs/plans/2026-07-23-improvement-plan.md) — **the PRD's own prompt-injection safeguard was never implemented**, add before any write capability.
 
 **Purpose**
 An MCP (Model Context Protocol) server that connects to Telegram **as a real user account** (MTProto via GramJS), exposing read-only tools to MCP clients (Claude Desktop, Cursor, etc.): read & search messages, list chats/folders, inspect group info, get pinned messages, and download media. Because it authenticates as the user, it can see everything the account can — private channels, groups, and DMs a bot cannot.
