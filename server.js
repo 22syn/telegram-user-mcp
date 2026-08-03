@@ -85,7 +85,9 @@ function groupId(msg) {
 }
 
 function formatMsg(msg) {
-    const date = new Date(msg.date * 1000).toISOString().slice(0, 16).replace('T', ' ');
+    // Seconds matter: the album fallback for messages without a groupedId keys off a 2s
+    // window, and a same-MINUTE rule would wrongly merge unrelated bursts.
+    const date = new Date(msg.date * 1000).toISOString().slice(0, 19).replace('T', ' ');
     const sender = msg.sender
         ? (msg.sender.username ? `@${msg.sender.username}` : msg.sender.firstName || 'Unknown')
         : 'Unknown';
@@ -416,7 +418,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 }
                 const lines = (res.messages || []).map(m => {
                     const where = names[peerKey(m.peerId)] || '?';
-                    const date  = m.date ? new Date(m.date * 1000).toISOString().slice(0, 16).replace('T', ' ') : '';
+                    const date  = m.date ? new Date(m.date * 1000).toISOString().slice(0, 19).replace('T', ' ') : '';
                     return `[${date}] (${where}) ${m.message || '[media/no text]'}`;
                 });
                 return { content: [{ type: 'text', text: `Found ${lines.length} for "${args.query}":\n` + (lines.join('\n') || '(none)') }] };
