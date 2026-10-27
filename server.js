@@ -238,6 +238,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
                     groupUrl: { type: 'string', description: 'Group URL or @username' },
                     sinceId:  { type: 'number', description: 'Return messages with id greater than this' },
                     limit:    { type: 'number', description: 'Max messages (default 100, max 200)' },
+                    oldestFirst: { type: 'boolean', description: 'Return the OLDEST `limit` messages after sinceId instead of the newest. Use when draining a backlog larger than `limit` page by page — the default skips everything between sinceId and the newest `limit`.' },
                 },
                 required: ['groupUrl', 'sinceId'],
             },
@@ -391,12 +392,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case 'fetch_since': {
                 const entity = await resolveGroup(args.groupUrl);
                 const limit  = Math.min(args.limit ?? 100, 200);
-                const msgs   = await client.getMessages(entity, { minId: args.sinceId, limit });
+                // reverse:true makes minId the starting offset and walks forward, so a backlog
+                // drains oldest-first instead of being skipped (default: newest `limit`).
+                const msgs   = await client.getMessages(entity, { minId: args.sinceId, limit, reverse: !!args.oldestFirst });
                 if (!msgs.length) {
                     return { content: [{ type: 'text', text: `(no new messages since id ${args.sinceId})` }] };
                 }
                 const maxId  = Math.max(...msgs.map(m => m.id));
-                const lines  = msgs.reverse().map(formatMsg);
+                const ordered = args.oldestFirst ? msgs : [...msgs].reverse();
+                const lines  = ordered.map(formatMsg);
                 return { content: [{ type: 'text', text: `New messages (maxId=${maxId}):\n` + lines.join('\n') }] };
             }
 
